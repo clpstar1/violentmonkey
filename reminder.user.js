@@ -45,32 +45,31 @@ If thats of concern to you, you should seek other ways to store the counter than
 // @match       *://mat6tube*/*
 // @grant       GM_xmlhttpRequest
 // @grant       GM_getValues
+// @grant       window.close
 // @version     1.0
 // @author      -
 // @description 2/12/2025, 3:06:31 PM
 // ==/UserScript==
 
 var showPopup = true;
-var debug = false;
+var gh_token = undefined;
+var gh_url = undefined;
 
 (function () {
     'use strict';
 
     if (!showPopup) return;
 
-    let values = GM_getValues(['token', 'counter_url', 'redirect_url', 'debug'])
-    let gh_token = values['token']
-    let gh_url = values['counter_url']
-    let redirect_url = values['redirect_url'] || "https://www.youtube.com"
-    console.log(values)
-    debug = values['debug'] == true || false;
-    console.log(debug)
+    let values = GM_getValues(['gh_token', 'gh_url', 'redirect_url', 'debug'])
+    gh_token = values['gh_token']
+    gh_url = values['gh_url']
 
-    displayPopup(gh_token, gh_url, redirect_url);
+    displayPopup()
 
 })();
 
-function getCounterFromGh(gh_token, gh_url) {
+function getGhCounter() {
+
     return new Promise((resolve, reject) => {
         const details = {
             url: gh_url,
@@ -81,10 +80,22 @@ function getCounterFromGh(gh_token, gh_url) {
             },
 
             onload: function (response) {
-                resolve(response)
+                try {
+                    let responseJson = JSON.parse(response.response)
+                    console.debug("get response:")
+                    console.debug(JSON.stringify(responseJson, null, 2))
+                    if (response.status != 200) reject(response)
+                    let counterDecoded = atob(responseJson.content)
+                    let counterJson = JSON.parse(counterDecoded)
+                    let counter = parseInt(counterJson.counter)
+                    resolve([counter, responseJson.sha])
+                }
+                catch (e) {
+                    reject(e)
+                }
             },
             onerror: (response) => {
-                resolve(response)
+                reject(response)
             }
         }
         GM_xmlhttpRequest(details)
@@ -92,38 +103,46 @@ function getCounterFromGh(gh_token, gh_url) {
 }
 
 
-function updateGhCounter(newValue, sha, gh_token, gh_url) {
+function updateGhCounter(update_fn) {
     return new Promise((resolve, reject) => {
-        const details = {
-            url: gh_url,
-            method: "PUT",
-            headers: {
-                "Authorization": gh_token,
-                "Accept": "application/vnd.github+json"
-            },
-            data: JSON.stringify({
-                message: "update counter",
-                content: btoa(JSON.stringify({ counter: newValue.toString() })),
-                sha: sha
-            }),
-            // https://docs.github.com/en/rest/repos/contents?apiVersion=2022-11-28#create-or-update-file-contents
-            onload: function (response) {
-                resolve(response)
-            },
-            onerror: function (response) {
-                resolve(response)
-            }
-        }
-        GM_xmlhttpRequest(details)
+        getGhCounter()
+            .then(([counter, sha]) => {
+                let new_counter = update_fn(counter)
+                let details = {
+                    url: gh_url,
+                    method: "PUT",
+                    headers: {
+                        "Authorization": gh_token,
+                        "Accept": "application/vnd.github+json"
+                    },
+                    data: JSON.stringify({
+                        message: "update counter",
+                        content: btoa(JSON.stringify({ counter: new_counter.toString() })),
+                        sha: sha
+                    }),
+                    // https://docs.github.com/en/rest/repos/contents?apiVersion=2022-11-28#create-or-update-file-contents
+                    onload: function (response) {
+                        let responseJson = JSON.parse(response.response)
+                        console.debug("post response:")
+                        console.debug(JSON.stringify(responseJson, null, 2))
+                        if (response.status != 200) reject(response)
+                        resolve(new_counter)
+                    },
+                    onerror: function (response) {
+                        reject(response)
+                    }
+                }
+                GM_xmlhttpRequest(details)
+            })
+
     })
 }
 
-function displayPopup(gh_token, gh_url, redirect_url) {
+function displayPopup() {
 
     if (!showPopup) return;
 
     var counter = 'N/A'
-
 
     // Create a modal popup
     const popup = document.createElement('div')
@@ -152,54 +171,30 @@ function displayPopup(gh_token, gh_url, redirect_url) {
     document.body.appendChild(popup);
 
     if (gh_token != undefined && gh_url != undefined) {
-        getCounterFromGh(gh_token, gh_url)
-            .then(response => {
-                try {
-                    let responseJson =JSON.parse(response.response)
-                    if (debug) {
-                        console.log("get response:")
-                        console.log(JSON.stringify(responseJson, null, 2))
-                    }
-                    if (response.status >= 400) throw new Error(response)
-                    counterDecoded = atob(responseJson.content)
-                    let counterJson = JSON.parse(counterDecoded)
-                    counter = parseInt(counterJson.counter)
-                    let sha = responseJson.sha
+        getGhCounter()
+            .then(([counter, _]) => document.getElementById("counterLabel").innerHTML = counter)
+            .catch(reason => console.error(reason))
+    }
 
-                    document.getElementById("counterLabel").innerHTML = counter
-                    document.getElementById('proceedBtn').addEventListener('click', () => {
-                        updateGhCounter(0, sha, gh_token, gh_url)
-                            .then((response) => {
-                                if (debug) {
-                                    let responseJson =JSON.parse(response.response)
-                                    console.log("get response:")
-                                    console.log(JSON.stringify(responseJson, null, 2))
-                                } else {
-                                    showPopup = false;
-                                    document.body.removeChild(popup)
-                                }
-                            })
-                            .catch(e => console.error(e))
-                    })
-                    document.getElementById('resistBtn').addEventListener('click', () => {
-                        updateGhCounter(counter + 1, sha, gh_token, gh_url)
-                            .then((response) => { 
-                                if (debug) {
-                                    let responseJson =JSON.parse(response.response)
-                                    console.log("post response:")
-                                    console.log(JSON.stringify(responseJson, null, 2))
-                                } else {
-                                    window.location.href = redirect_url
-                                }
-                            })
-                            .catch(e => console.error(e))
-                    })
-                }
-                catch (e) {
-                    console.error(e)
-                }
-            })
-            .catch(e => console.error(e))
+    if (gh_token != undefined && gh_url != undefined) {
+        document.getElementById('proceedBtn').addEventListener('click', () => {
+            updateGhCounter((_ => 0))
+                .then(new_counter => document.getElementById("counterLabel").innerHTML = new_counter)
+                .catch(reason => console.error(reason))
+                .finally(() => {
+                    showPopup = false
+                    document.body.removeChild(popup)
+                })
+        })
+        document.getElementById('resistBtn').addEventListener('click', () => {
+            updateGhCounter(old_counter => parseInt(old_counter) + 1)
+                .then(new_counter => document.getElementById("counterLabel").innerHTML = new_counter)
+                .catch(reason => console.error(reason))
+                .finally(() => {
+                    window.close()
+                })
+
+        })
     } else {
         document.getElementById('proceedBtn').addEventListener('click', () => {
             showPopup = false
