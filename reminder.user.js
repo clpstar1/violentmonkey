@@ -1,38 +1,3 @@
-/* Instructions
-
-What: 
-When you access a site which matches one of the Violentmonkey @match rules below
-this script will show a fullscreen modal as a reminder if you really want to continue.
-You're free to continue by pressing the "Break Streak" Button which will grant access to the site.
-If you press "Resist" it will redirect the browser tab to a user defined web-page.
-
-As a little motivation to resist accessing the site the script will try to count how often you resisted and
-show it in the modal. If you access the site, the counter will reset to 0, if you resist it goes up by 1.
-The current implementation uses github repositories as a persistence layer for storing the counter.
-See Counter-Integration in the Setup section. 
-This is optional though. If you wish to skip it, the counter will show N/A as a default.
-
-Setup: 
-- Install Violentmonkey and add this Script as a userscript
-
-Counter-Integration:
-- Setup a Github repository and create a file counter.json with the contents
-{
-"counter" : "0"
-}
-- Create a fine grained access token with Read and Write Access for that Repository 
-- Create the following Violentmonkey Values for the Userscript:
-{
-"gh_token" : "Bearer <YOUR-CREATED-GITHUB-TOKEN>"
-"gh_url" : "https://api.github.com/repos/<YOUR-USERNAME>/<YOUR-REPONAME>/contents/counter.json
-"redirect_url": "<YOUR-PREFERRED-REDIRECT-URL>"
-}
-
-Known Problems:
-The counter sometimes doesn't seem to update instantly. 
-If thats of concern to you, you should seek other ways to store the counter than Gihtub.
-*/
-
 // ==UserScript==
 // @name        Porn Reminder
 // @namespace   Violentmonkey Scripts
@@ -51,6 +16,7 @@ If thats of concern to you, you should seek other ways to store the counter than
 var showPopup = true;
 var gh_token = undefined;
 var gh_url = undefined;
+var streak_global = "0";
 
 (function () {
     'use strict';
@@ -59,7 +25,7 @@ var gh_url = undefined;
         return;
     }
 
-    let values = GM_getValues(['gh_token', 'gh_url', 'redirect_url', 'debug'])
+    let values = GM_getValues(['gh_token', 'gh_url'])
     gh_token = values['gh_token']
     gh_url = values['gh_url']
 
@@ -69,6 +35,7 @@ var gh_url = undefined;
 
 function getStreak() {
     if (gh_token == undefined || gh_url == undefined) {
+        console.log("not getting streak, variable(s) undefined")
         return Promise.resolve("0")
     }
 
@@ -115,72 +82,44 @@ function getStreak() {
 
 }
 
-function getGhCounter() {
+function resetStreak() {
+    if (gh_token == undefined || gh_url == undefined) {
+        console.debug("not resetting streak, variable(s) undefined")
+        return Promise.resolve()
+    }
 
     return new Promise((resolve, reject) => {
-        const details = {
+
+        if (streak_global == "0") {
+            console.debug("not resetting streak, streak is already 0")
+            resolve()
+        }
+
+        let today = new Date()
+        let dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`
+
+        let details = {
             url: gh_url,
-            method: "GET",
+            method: "PATCH",
             headers: {
                 "Authorization": gh_token,
                 "Accept": "application/vnd.github+json"
             },
-
+            data: JSON.stringify(
+                {
+                    name: "COUNTER",
+                    value: dateString
+                }
+            ),
             onload: function (response) {
-                try {
-                    let responseJson = JSON.parse(response.response)
-                    console.debug("get response:")
-                    console.debug(JSON.stringify(responseJson, null, 2))
-                    if (response.status != 200) reject(response)
-                    let dateDecoded = atob(responseJson.content)
-                    let dateJson = JSON.parse(dateDecoded)
-                    resolve([dateJson.counter, responseJson.sha])
-                }
-                catch (e) {
-                    reject(e)
-                }
+                if (response.status != 204) reject(response)
+                resolve()
             },
-            onerror: (response) => {
+            onerror: function (response) {
                 reject(response)
             }
         }
         GM_xmlhttpRequest(details)
-    })
-}
-
-
-function updateGhCounter(update_fn) {
-    return new Promise((resolve, reject) => {
-        getGhCounter()
-            .then(([counter, sha]) => {
-                let new_counter = update_fn(counter)
-                let details = {
-                    url: gh_url,
-                    method: "PUT",
-                    headers: {
-                        "Authorization": gh_token,
-                        "Accept": "application/vnd.github+json"
-                    },
-                    data: JSON.stringify({
-                        message: "update counter",
-                        content: btoa(JSON.stringify({ counter: new_counter.toString() })),
-                        sha: sha
-                    }),
-                    // https://docs.github.com/en/rest/repos/contents?apiVersion=2022-11-28#create-or-update-file-contents
-                    onload: function (response) {
-                        let responseJson = JSON.parse(response.response)
-                        console.debug("post response:")
-                        console.debug(JSON.stringify(responseJson, null, 2))
-                        if (response.status != 200) reject(response)
-                        resolve(new_counter)
-                    },
-                    onerror: function (response) {
-                        reject(response)
-                    }
-                }
-                GM_xmlhttpRequest(details)
-            })
-
     })
 }
 
@@ -204,52 +143,31 @@ function displayPopup() {
     popup.style.fontSize = '24px';
     popup.style.zIndex = '10000';
     popup.innerHTML = `
-                <h2 style="color: initial">Are you sure you want to look at porn?</h2>
-                <p/>
-                <button style="color: initial" id="proceedBtn">Break Streak</button>
-                <p/>
-                <p style="color: initial">You've already resisted for: <strong id="counterLabel">${counter}</strong> days!</p>
+                <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; margin-left: 16px; margin-right: 16px;">
+                    <h2 style="color: initial">Are you sure you want to look at porn?</h2>
+                    <p/>
+                    <button style="color: initial" id="proceedBtn">Break Streak</button>
+                    <p/>
+                    <p style="color: initial">You've already resisted for: <strong id="counterLabel">${counter}</strong> days!</p>
+                </div>
             `;
 
     document.body.appendChild(popup);
 
     getStreak()
-        .then(streak => { document.getElementById("counterLabel").innerHTML = streak })
-        .catch(e => console.error(e))
-    return;
-
-    if (gh_token != undefined && gh_url != undefined) {
-        getGhCounter()
-            .then(([dateString, _]) => {
-                // https://www.geeksforgeeks.org/how-to-calculate-the-number-of-days-between-two-dates-in-javascript/
-                let today = new Date(Date.now())
-                today.setHours(0, 0, 0, 0)
-                let brokenOn = new Date(dateString)
-                brokenOn.setHours(0, 0, 0, 0)
-
-                let streakInDays = Math.round((today.getTime() - brokenOn.getTime()) / (1000 * 3600 * 24))
-
-            })
-            .catch(reason => console.error(reason))
-    }
-
-    if (gh_token != undefined && gh_url != undefined) {
-        document.getElementById('proceedBtn').addEventListener('click', () => {
-            sessionStorage.setItem("showPopup", "false")
-            document.body.removeChild(popup)
-            updateGhCounter((_ => 0))
-                .then(_ => document.getElementById("counterLabel").innerHTML = "0")
-                .catch(reason => console.error(reason))
-                .finally(() => {
-                    showPopup = false
-                    document.body.removeChild(popup)
-                })
+        .then(streak => {
+            document.getElementById("counterLabel").innerHTML = streak
+            streak_global = streak
         })
-    } else {
-        document.getElementById('proceedBtn').addEventListener('click', () => {
-            showPopup = false
-            document.body.removeChild(popup)
-        });
-    }
+        .catch(e => console.error(e))
 
+
+    document.getElementById('proceedBtn').addEventListener('click', () => {
+        resetStreak()
+            .catch(reason => console.error(reason))
+            .finally(() => {
+                sessionStorage.setItem("showPopup", "false")
+                document.body.removeChild(popup)
+            })
+    })
 }
