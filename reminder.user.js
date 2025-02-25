@@ -31,8 +31,6 @@ Counter-Integration:
 Known Problems:
 The counter sometimes doesn't seem to update instantly. 
 If thats of concern to you, you should seek other ways to store the counter than Gihtub.
-
-
 */
 
 // ==UserScript==
@@ -40,12 +38,11 @@ If thats of concern to you, you should seek other ways to store the counter than
 // @namespace   Violentmonkey Scripts
 // @match       *://*hentai*/*
 // @match       *://*porn*/*
-// @match       *://4chan*/h/*
-// @match       *://sxyprn*/*
-// @match       *://mat6tube*/*
+// @match       *://*4chan*/h/*
+// @match       *://*sxyprn*/*
+// @match       *://*mat6tube*/*
 // @grant       GM_xmlhttpRequest
 // @grant       GM_getValues
-// @grant       window.close
 // @version     1.0
 // @author      -
 // @description 2/12/2025, 3:06:31 PM
@@ -58,7 +55,9 @@ var gh_url = undefined;
 (function () {
     'use strict';
 
-    if (!showPopup) return;
+    if (sessionStorage.getItem("showPopup") == "false") {
+        return;
+    }
 
     let values = GM_getValues(['gh_token', 'gh_url', 'redirect_url', 'debug'])
     gh_token = values['gh_token']
@@ -140,8 +139,6 @@ function updateGhCounter(update_fn) {
 
 function displayPopup() {
 
-    if (!showPopup) return;
-
     var counter = 'N/A'
 
     // Create a modal popup
@@ -163,9 +160,8 @@ function displayPopup() {
                 <h2 style="color: initial">Are you sure you want to look at porn?</h2>
                 <p/>
                 <button style="color: initial" id="proceedBtn">Break Streak</button>
-                <button style="color: initial" id="resistBtn">Resist</button>
                 <p/>
-                <p style="color: initial">You've already resisted: <strong id="counterLabel">${counter}</strong> times!</p>
+                <p style="color: initial">You've already resisted for: <strong id="counterLabel">${counter}</strong> days!</p>
             `;
 
     document.body.appendChild(popup);
@@ -178,30 +174,21 @@ function displayPopup() {
 
     if (gh_token != undefined && gh_url != undefined) {
         document.getElementById('proceedBtn').addEventListener('click', () => {
-            updateGhCounter((_ => 0))
-                .then(new_counter => document.getElementById("counterLabel").innerHTML = new_counter)
-                .catch(reason => console.error(reason))
-                .finally(() => {
-                    showPopup = false
-                    document.body.removeChild(popup)
-                })
-        })
-        document.getElementById('resistBtn').addEventListener('click', () => {
-            updateGhCounter(old_counter => parseInt(old_counter) + 1)
-                .then(new_counter => document.getElementById("counterLabel").innerHTML = new_counter)
-                .catch(reason => console.error(reason))
-                .finally(() => {
-                    window.close()
-                })
-
+            sessionStorage.setItem("showPopup", "false")
+            document.body.removeChild(popup)
+            // updateGhCounter((_ => 0))
+            //     .then(new_counter => document.getElementById("counterLabel").innerHTML = new_counter)
+            //     .catch(reason => console.error(reason))
+            //     .finally(() => {
+            //         showPopup = false
+            //         document.body.removeChild(popup)
+            //     })
         })
     } else {
         document.getElementById('proceedBtn').addEventListener('click', () => {
             showPopup = false
             document.body.removeChild(popup)
         });
-
-        document.getElementById('resistBtn').addEventListener('click', () => window.location.href = redirect_url)
     }
 
 }
