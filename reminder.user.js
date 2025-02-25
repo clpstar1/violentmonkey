@@ -67,6 +67,54 @@ var gh_url = undefined;
 
 })();
 
+function getStreak() {
+    if (gh_token == undefined || gh_url == undefined) {
+        return Promise.resolve("0")
+    }
+
+    return new Promise((resolve, reject) => {
+        const details = {
+            url: gh_url,
+            method: "GET",
+            headers: {
+                "Authorization": gh_token,
+                "Accept": "application/vnd.github+json"
+            },
+
+            onload: function (response) {
+                try {
+                    /*
+                    {
+                      "name": "USERNAME",
+                      "value": "octocat",
+                      "created_at": "2021-08-10T14:59:22Z",
+                      "updated_at": "2022-01-10T14:59:22Z"
+                    }
+                    */
+                    let json = JSON.parse(response.response)
+                    if (response.status != 200) reject(response)
+
+                    let today = new Date(Date.now())
+                    today.setHours(0, 0, 0, 0)
+                    let brokenOn = new Date(json.value)
+                    brokenOn.setHours(0, 0, 0, 0)
+
+                    return resolve(Math.round((today.getTime() - brokenOn.getTime()) / (1000 * 3600 * 24)))
+
+                }
+                catch (e) {
+                    reject(e)
+                }
+            },
+            onerror: function (response) {
+                reject(response)
+            }
+        }
+        GM_xmlhttpRequest(details)
+    })
+
+}
+
 function getGhCounter() {
 
     return new Promise((resolve, reject) => {
@@ -84,10 +132,9 @@ function getGhCounter() {
                     console.debug("get response:")
                     console.debug(JSON.stringify(responseJson, null, 2))
                     if (response.status != 200) reject(response)
-                    let counterDecoded = atob(responseJson.content)
-                    let counterJson = JSON.parse(counterDecoded)
-                    let counter = parseInt(counterJson.counter)
-                    resolve([counter, responseJson.sha])
+                    let dateDecoded = atob(responseJson.content)
+                    let dateJson = JSON.parse(dateDecoded)
+                    resolve([dateJson.counter, responseJson.sha])
                 }
                 catch (e) {
                     reject(e)
@@ -166,9 +213,23 @@ function displayPopup() {
 
     document.body.appendChild(popup);
 
+    getStreak()
+        .then(streak => { document.getElementById("counterLabel").innerHTML = streak })
+        .catch(e => console.error(e))
+    return;
+
     if (gh_token != undefined && gh_url != undefined) {
         getGhCounter()
-            .then(([counter, _]) => document.getElementById("counterLabel").innerHTML = counter)
+            .then(([dateString, _]) => {
+                // https://www.geeksforgeeks.org/how-to-calculate-the-number-of-days-between-two-dates-in-javascript/
+                let today = new Date(Date.now())
+                today.setHours(0, 0, 0, 0)
+                let brokenOn = new Date(dateString)
+                brokenOn.setHours(0, 0, 0, 0)
+
+                let streakInDays = Math.round((today.getTime() - brokenOn.getTime()) / (1000 * 3600 * 24))
+
+            })
             .catch(reason => console.error(reason))
     }
 
@@ -176,13 +237,13 @@ function displayPopup() {
         document.getElementById('proceedBtn').addEventListener('click', () => {
             sessionStorage.setItem("showPopup", "false")
             document.body.removeChild(popup)
-            // updateGhCounter((_ => 0))
-            //     .then(new_counter => document.getElementById("counterLabel").innerHTML = new_counter)
-            //     .catch(reason => console.error(reason))
-            //     .finally(() => {
-            //         showPopup = false
-            //         document.body.removeChild(popup)
-            //     })
+            updateGhCounter((_ => 0))
+                .then(_ => document.getElementById("counterLabel").innerHTML = "0")
+                .catch(reason => console.error(reason))
+                .finally(() => {
+                    showPopup = false
+                    document.body.removeChild(popup)
+                })
         })
     } else {
         document.getElementById('proceedBtn').addEventListener('click', () => {
