@@ -26,7 +26,18 @@ const baseUrl = "https://safebooru.org";
 
         console.log(hrefs)
 
+        let pid = "0"
+        let url = window.location.href
+
+        let match = window.location.href.match(/(.*)&pid=(\d+)/)
+        if (match && match.length > 2) {
+            pid = match[2]
+            url = match[1]
+        }
+
         localStorage.setItem("safebooru-hrefs", hrefs.join(";"))
+        localStorage.setItem("safebooru-pid", pid)
+        localStorage.setItem("safebooru-url", url)
     }
 
     // post view
@@ -51,6 +62,14 @@ const baseUrl = "https://safebooru.org";
                     cur += 1
                 }
 
+                if (cur == 0) {
+                    let url = localStorage.getItem("safebooru-url")
+                    let pid = localStorage.getItem("safebooru-pid")
+                    let nextPid = (parseInt(pid) - hrefs.length).toString()
+                    window.location.href = url + "&pid=" + nextPid
+                    return;
+                }
+
                 window.location = baseUrl + hrefs[cur - 1]
 
             }
@@ -66,7 +85,16 @@ const baseUrl = "https://safebooru.org";
                     cur += 1
                 }
 
-                window.location = baseUrl + hrefs[cur + 1]
+                if (cur == hrefs.length - 1) {
+                    let url = localStorage.getItem("safebooru-url")
+                    let pid = localStorage.getItem("safebooru-pid")
+                    let nextPid = (parseInt(pid) + hrefs.length).toString()
+                    window.location.href = url + "&pid=" + nextPid
+                }
+                else {
+                    window.location = baseUrl + hrefs[cur + 1]
+                }
+
             }
         })
 
