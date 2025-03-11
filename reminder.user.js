@@ -145,11 +145,25 @@ function displayPopup() {
     popup.style.fontSize = '24px';
     popup.style.zIndex = '10000';
     popup.innerHTML = `
+                <style>
+                    .mybutton {
+                      border: none;
+                      color: white;
+                      padding: 15px 32px;
+                      text-align: center;
+                      text-decoration: none;
+                      display: inline-block;
+                      font-size: 16px;
+                      margin: 4px 2px;
+                      cursor: pointer;
+                    }
+                    .mybutton1 {background-color: #cc2131;} /* Green */
+                </style>
                 <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; margin-left: 16px; margin-right: 16px;">
-                    <img style="width:300px; height=290px;"src="https://github.com/clpstar1/violentmonkey/blob/7d68965e13bf7f8455490841c7d32d7a23bb6b22/romatic2.gif?raw=true"/>
+                    <img style="width:300px; height=290px;"src="https://raw.githubusercontent.com/clpstar1/violentmonkey/refs/heads/main/romatic.gif"/>
                     <h2 style="color: initial">Are you sure you want to look at porn?</h2>
                     <p/>
-                    <button style="color: initial" id="proceedBtn">Break Streak</button>
+                    <button class="mybutton mybutton1" id="proceedBtn">Break Streak</button>
                     <p/>
                     <p style="color: initial">You've already resisted for: <strong id="counterLabel">${counter}</strong> days!</p>
                 </div>
