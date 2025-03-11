@@ -3,9 +3,12 @@
 // @namespace   Violentmonkey Scripts
 // @match       *://*hentai*/*
 // @match       *://*porn*/*
-// @match       *://*4chan*/h/*
 // @match       *://*sxyprn*/*
 // @match       *://*mat6tube*/*
+// @match       *://*donmai.us/*
+// @match       *://*gelbooru*/*
+// @match       *://*sankakucomplex*/*
+// @include      /.*4chan.*[ehd]/
 // @grant       GM_xmlhttpRequest
 // @grant       GM_getValues
 // @version     1.0
@@ -30,7 +33,6 @@ var streak_global = "0";
     gh_url = values['gh_url']
 
     displayPopup()
-
 })();
 
 function getStreak() {
@@ -144,6 +146,7 @@ function displayPopup() {
     popup.style.zIndex = '10000';
     popup.innerHTML = `
                 <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; margin-left: 16px; margin-right: 16px;">
+                    <img style="width:300px; height=290px;"src="https://github.com/clpstar1/violentmonkey/blob/7d68965e13bf7f8455490841c7d32d7a23bb6b22/romatic2.gif?raw=true"/>
                     <h2 style="color: initial">Are you sure you want to look at porn?</h2>
                     <p/>
                     <button style="color: initial" id="proceedBtn">Break Streak</button>
