@@ -1,3 +1,5 @@
+// 4chan.org/a
+
 // ==UserScript==
 // @name        Porn Reminder
 // @namespace   Violentmonkey Scripts
@@ -8,7 +10,7 @@
 // @match       *://*donmai.us/*
 // @match       *://*gelbooru*/*
 // @match       *://*sankakucomplex*/*
-// @include      /.*4chan.*[ehd]/
+// @include     /\.4chan\.org\/[ehds]\/*/
 // @grant       GM_xmlhttpRequest
 // @grant       GM_getValues
 // @version     1.0
@@ -52,14 +54,6 @@ function getStreak() {
 
             onload: function (response) {
                 try {
-                    /*
-                    {
-                      "name": "USERNAME",
-                      "value": "octocat",
-                      "created_at": "2021-08-10T14:59:22Z",
-                      "updated_at": "2022-01-10T14:59:22Z"
-                    }
-                    */
                     let json = JSON.parse(response.response)
                     if (response.status != 200) reject(response)
 
